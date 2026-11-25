@@ -45,6 +45,11 @@ def _infer(s: pd.Series, formats: dict) -> str:
         return "datetime"
     numeric = pd.to_numeric(s, errors="coerce")
     if s.notna().sum() and numeric.notna().sum() / s.notna().sum() > 0.95:
+        text = s.dropna().astype(str)
+        # digits with leading zeros (zip codes, account numbers) are identifiers, not numbers:
+        # converting them would turn "02139" into 2139
+        if text.str.match(r"^0\d").mean() > 0.01 or formats.get("zip5", 0) > 0.95:
+            return "identifier (digits as text)"
         return "number (stored as text)"
     if formats.get("iso_date", 0) + formats.get("us_date", 0) > 0.95:
         return "date (stored as text)"
