@@ -85,11 +85,12 @@ def profile_column(s: pd.Series) -> dict:
     return col
 
 
-def warnings_for(name: str, c: dict, rows: int) -> list[str]:
+def warnings_for(name: str, c: dict, rows: int, text_source: bool = False) -> list[str]:
     w = []
     if c["null_share"] > 0.5:
         w.append(f"{name}: {c['null_share']:.0%} null")
-    if c["inferred_type"].endswith("(stored as text)"):
+    # in a CSV every value is text, so "stored as text" is only worth flagging for typed sources
+    if c["inferred_type"].endswith("(stored as text)") and not text_source:
         w.append(f"{name}: {c['inferred_type']}")
     nm = c.get("numeric", {})
     if nm.get("non_numeric_values"):
@@ -107,10 +108,11 @@ def warnings_for(name: str, c: dict, rows: int) -> list[str]:
     return w
 
 
-def profile(df: pd.DataFrame, name: str = "dataset") -> dict:
+def profile(df: pd.DataFrame, name: str = "dataset", text_source: bool = False) -> dict:
+    """text_source=True for files where every value arrives as text (CSV)."""
     cols = {c: profile_column(df[c]) for c in df.columns}
     keys = [c for c, p in cols.items() if p["null_share"] == 0 and p["distinct"] == len(df)]
-    warns = [w for c, p in cols.items() for w in warnings_for(c, p, len(df))]
+    warns = [w for c, p in cols.items() for w in warnings_for(c, p, len(df), text_source)]
     dups = int(df.astype(str).duplicated().sum())
     if dups:
         warns.insert(0, f"{dups} fully duplicated rows")
